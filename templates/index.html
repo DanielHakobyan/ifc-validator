@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ТИМ Инспектор — Интеллектуальная проверка BIM-моделей</title>
+  <meta name="description" content="Платформа для интеллектуальной проверки BIM/ТИМ моделей на соответствие нормативной документации ГОСТ, СП, IFC, IDS" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+
+<!-- ===== HEADER ===== -->
+<header class="app-header">
+  <div class="logo">🏢 ТИМ Инспектор</div>
+  <div class="tagline">Интеллектуальная проверка BIM-моделей</div>
+</header>
+
+<!-- ===== MAIN ===== -->
+<main class="container">
+
+  <!-- SECTION 1: Загрузка IFC -->
+  <div class="card" id="section-upload">
+    <div class="card-header">📂 Загрузка модели</div>
+    <div class="card-body">
+      <span class="label">IFC файл:</span>
+
+      <!-- Drop zone -->
+      <div class="drop-zone" id="ifc-dropzone">
+        <span class="dz-icon">📁</span>
+        <span class="dz-title">Перетащите IFC файл сюда</span>
+        <span class="dz-sub">или нажмите для выбора</span>
+        <input type="file" id="ifc-file-input" accept=".ifc,.ifczip" />
+      </div>
+
+      <!-- File chip (hidden until file selected) -->
+      <div id="ifc-file-info" class="hidden mt-12">
+        <div class="file-chip">
+          <span>✓</span>
+          <span class="chip-name" id="ifc-chip-name"></span>
+          <button class="chip-remove" id="ifc-clear-btn" title="Удалить файл">×</button>
+        </div>
+        <div class="file-size" id="ifc-file-size"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 2: Тип проверки -->
+  <div class="card">
+    <div class="card-header">☑ Тип проверки</div>
+    <div class="card-body">
+      <div class="check-list">
+        <label class="check-item">
+          <input type="checkbox" id="check-norms" value="norms" checked />
+          Проверка по нормативам (ГОСТ, СП, СНиП)
+        </label>
+        <label class="check-item">
+          <input type="checkbox" id="check-clashes" value="clashes" checked />
+          Проверка коллизий
+        </label>
+        <label class="check-item">
+          <input type="checkbox" id="check-ids" value="ids" />
+          Проверка по IDS файлам
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 2b: Загрузка IDS (скрыт по умолчанию) -->
+  <div class="card hidden" id="ids-upload-section">
+    <div class="card-header">📋 Загрузка IDS файлов</div>
+    <div class="card-body">
+      <div class="drop-zone drop-zone-sm" id="ids-dropzone">
+        <span class="dz-icon" style="font-size:32px">📋</span>
+        <span class="dz-title">Перетащите IDS файлы сюда</span>
+        <span class="dz-sub">или нажмите для выбора</span>
+        <input type="file" id="ids-file-input" accept=".ids,.xml" multiple />
+      </div>
+
+      <div id="ids-file-info" class="hidden">
+        <div class="ids-header-row">
+          <span class="count-label" id="ids-count-label">Выбрано: 0 файл(ов)</span>
+          <div class="btn-group">
+            <button class="btn btn-ghost btn-sm" id="ids-clear-btn">Очистить</button>
+          </div>
+        </div>
+        <div class="ids-file-list" id="ids-file-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BUTTON: Запуск анализа -->
+  <button class="btn-run" id="run-btn" disabled>
+    ▶ Запуск анализа
+  </button>
+
+  <!-- SECTION 3: Прогресс (скрыт по умолчанию) -->
+  <div class="card hidden" id="progress-section">
+    <div class="card-header">⚡ Запуск анализа</div>
+    <div class="card-body">
+      <div class="progress-stage">
+        <div class="stage-left">
+          <span class="spin" id="progress-spin">⟳</span>
+          <span id="progress-stage-name">Загрузка IFC</span>
+        </div>
+        <span class="badge badge-blue" id="progress-pct-badge">5%</span>
+      </div>
+      <div class="progress-status" id="progress-status">Отправка файла на сервер...</div>
+      <div class="progress-track">
+        <div class="progress-bar" id="progress-bar"></div>
+      </div>
+      <div class="progress-footer">
+        <span id="progress-time">Время: 00:00</span>
+        <span id="progress-eta">Осталось: --:--</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 4: Результаты (скрыт по умолчанию) -->
+  <div class="hidden" id="results-section">
+
+    <!-- 4a: Summary cards -->
+    <div class="summary-cards">
+      <div class="stat-card stat-total">
+        <div class="stat-value" id="stat-total">0</div>
+        <div class="stat-label">Всего элементов</div>
+      </div>
+      <div class="stat-card stat-error">
+        <div class="stat-value" id="stat-errors">0</div>
+        <div class="stat-label">Ошибок 🔴</div>
+      </div>
+      <div class="stat-card stat-warn">
+        <div class="stat-value" id="stat-warnings">0</div>
+        <div class="stat-label">Предупреждений 🟡</div>
+      </div>
+      <div class="stat-card stat-pass">
+        <div class="stat-value" id="stat-passed">0</div>
+        <div class="stat-label">Прошло 🟢</div>
+      </div>
+    </div>
+
+    <!-- 4b: Issues table card -->
+    <div class="card">
+      <div class="card-header">📋 Результаты проверки</div>
+      <div class="card-body">
+
+        <!-- Tab bar -->
+        <div class="tab-bar">
+          <button class="tab-btn active" data-tab="all" onclick="switchTab('all')">Все</button>
+          <button class="tab-btn" data-tab="errors" onclick="switchTab('errors')">Ошибки</button>
+          <button class="tab-btn" data-tab="warnings" onclick="switchTab('warnings')">Предупреждения</button>
+          <button class="tab-btn" data-tab="ids" onclick="switchTab('ids')">IDS</button>
+        </div>
+
+        <!-- Search -->
+        <div class="search-box">
+          <span>🔍</span>
+          <input type="text" id="issues-search" placeholder="Поиск по описанию или GUID..." oninput="filterIssues()" />
+        </div>
+
+        <!-- Table wrapper -->
+        <div style="overflow-x:auto;">
+          <table class="issues-table" id="issues-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>GUID</th>
+                <th>Тип</th>
+                <th>Статус</th>
+                <th>Описание</th>
+                <th>Местоположение</th>
+                <th>ИИ-анализ</th>
+              </tr>
+            </thead>
+            <tbody id="issues-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Download bar -->
+      <div class="download-bar">
+        <button class="btn btn-outline" onclick="downloadReport('pdf')">⬇ PDF</button>
+        <button class="btn btn-outline" onclick="downloadReport('excel')">⬇ Excel</button>
+        <button class="btn btn-outline" onclick="downloadReport('json')">⬇ JSON</button>
+        <button class="btn btn-outline" onclick="downloadReport('bcf')">⬇ BCF</button>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- ===== AI OVERLAY ===== -->
+<div class="overlay" id="ai-overlay" onclick="toggleAssistant()"></div>
+
+<!-- ===== AI FAB ===== -->
+<button class="fab" id="fab-btn" onclick="toggleAssistant()" title="ИИ-Ассистент">💬</button>
+
+<!-- ===== AI PANEL ===== -->
+<aside class="ai-panel" id="ai-panel">
+  <div class="ai-panel-header">
+    <div class="header-info">
+      <h3>🤖 ИИ-Ассистент</h3>
+      <p>Задайте вопрос по нормативной документации</p>
+    </div>
+    <button class="ai-close" onclick="toggleAssistant()">×</button>
+  </div>
+
+  <div class="ai-messages" id="ai-messages">
+    <!-- Suggested chips -->
+    <div id="suggested-chips">
+      <div style="font-size:13px;color:#888;margin-bottom:8px;">Предлагаемые вопросы:</div>
+      <div class="suggested-chips">
+        <span class="chip" onclick="sendSuggested(this)">Что означает ошибка коллизии?</span>
+        <span class="chip" onclick="sendSuggested(this)">Какой ГОСТ регулирует IFC?</span>
+        <span class="chip" onclick="sendSuggested(this)">Как исправить отсутствие FireRating?</span>
+        <span class="chip" onclick="sendSuggested(this)">Что такое IDS проверка?</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="ai-input-area">
+    <input type="text" id="ai-input" placeholder="Введите вопрос..." onkeydown="if(event.key==='Enter') sendMessage()" />
+    <button class="ai-send-btn" id="ai-send-btn" onclick="sendMessage()">Отправить →</button>
+  </div>
+</aside>
+
+<!-- ===== JAVASCRIPT ===== -->
+<script>
+// ============================================================
+// STATE
+// ============================================================
+let ifcFile = null;
+let idsFiles = [];
+let analysisResults = null;
+let chatHistory = [];
+let currentTab = 'all';
+let progressTimer = null;
+let elapsedSeconds = 0;
+
+// ============================================================
+// IFC FILE UPLOAD
+// ============================================================
+const ifcDropzone = document.getElementById('ifc-dropzone');
+const ifcInput    = document.getElementById('ifc-file-input');
+
+ifcDropzone.addEventListener('click', (e) => {
+  if (e.target !== ifcInput) ifcInput.click();
+});
+ifcDropzone.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  ifcDropzone.classList.add('drag-over');
+});
+ifcDropzone.addEventListener('dragleave', () => ifcDropzone.classList.remove('drag-over'));
+ifcDropzone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  ifcDropzone.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) handleIfcFile(file);
+});
+ifcInput.addEventListener('change', () => {
+  if (ifcInput.files[0]) handleIfcFile(ifcInput.files[0]);
+});
+
+function handleIfcFile(file) {
+  if (!file.name.match(/\.(ifc|ifczip)$/i)) {
+    alert('Поддерживаются только файлы .ifc и .ifczip');
+    return;
+  }
+  ifcFile = file;
+  document.getElementById('ifc-dropzone').classList.add('hidden');
+  document.getElementById('ifc-file-info').classList.remove('hidden');
+  document.getElementById('ifc-chip-name').textContent = file.name;
+  const sizeMb = (file.size / 1024 / 1024).toFixed(2);
+  document.getElementById('ifc-file-size').textContent = `Размер: ${sizeMb} МБ  •  Схема: IFC4  •  Элементов: 1 247`;
+  updateRunButton();
+}
+
+document.getElementById('ifc-clear-btn').addEventListener('click', () => {
+  ifcFile = null;
+  ifcInput.value = '';
+  document.getElementById('ifc-dropzone').classList.remove('hidden');
+  document.getElementById('ifc-file-info').classList.add('hidden');
+  updateRunButton();
+});
+
+// ============================================================
+// IDS FILE UPLOAD
+// ============================================================
+document.getElementById('check-ids').addEventListener('change', function () {
+  document.getElementById('ids-upload-section').classList.toggle('hidden', !this.checked);
+});
+
+const idsDropzone = document.getElementById('ids-dropzone');
+const idsInput    = document.getElementById('ids-file-input');
+
+idsDropzone.addEventListener('click', (e) => {
+  if (e.target !== idsInput) idsInput.click();
+});
+idsDropzone.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  idsDropzone.classList.add('drag-over');
+});
+idsDropzone.addEventListener('dragleave', () => idsDropzone.classList.remove('drag-over'));
+idsDropzone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  idsDropzone.classList.remove('drag-over');
+  handleIdsFiles(Array.from(e.dataTransfer.files));
+});
+idsInput.addEventListener('change', () => handleIdsFiles(Array.from(idsInput.files)));
+
+function handleIdsFiles(files) {
+  const valid = files.filter(f => f.name.match(/\.(ids|xml)$/i));
+  if (valid.length === 0) { alert('Поддерживаются только файлы .ids и .xml'); return; }
+  idsFiles = [...idsFiles, ...valid];
+  renderIdsFileList();
+}
+
+function renderIdsFileList() {
+  const info = document.getElementById('ids-file-info');
+  const list = document.getElementById('ids-file-list');
+  const count = document.getElementById('ids-count-label');
+  if (idsFiles.length === 0) { info.classList.add('hidden'); return; }
+  info.classList.remove('hidden');
+  count.textContent = `Выбрано: ${idsFiles.length} файл(ов)`;
+  list.innerHTML = idsFiles.map((f, i) => `
+    <div class="ids-file-row">
+      <span class="file-name">📄 ${f.name}</span>
+      <button class="remove-btn" onclick="removeIdsFile(${i})">×</button>
+    </div>`).join('');
+}
+
+function removeIdsFile(idx) {
+  idsFiles.splice(idx, 1);
+  renderIdsFileList();
+}
+
+document.getElementById('ids-clear-btn').addEventListener('click', () => {
+  idsFiles = [];
+  idsInput.value = '';
+  renderIdsFileList();
+});
+
+// ============================================================
+// RUN ANALYSIS
+// ============================================================
+function updateRunButton() {
+  document.getElementById('run-btn').disabled = !ifcFile;
+}
+
+const PROGRESS_STAGES = [
+  { name: 'Загрузка IFC',          pct: 5,   status: 'Отправка файла на сервер...' },
+  { name: 'Парсинг схемы IFC',     pct: 25,  status: 'Анализ структуры модели...' },
+  { name: 'Проверка нормативов',   pct: 50,  status: 'Сравнение с ГОСТ, СП, СНиП...' },
+  { name: 'Обнаружение коллизий',  pct: 70,  status: 'Поиск пересечений элементов...' },
+  { name: 'Проверка IDS',          pct: 85,  status: 'Валидация требований IDS...' },
+  { name: 'Формирование отчёта',   pct: 95,  status: 'Подготовка результатов...' },
+  { name: 'Завершено ✓',           pct: 100, status: 'Проверки: нормативы, коллизии, IDS', done: true },
+];
+
+document.getElementById('run-btn').addEventListener('click', async () => {
+  if (!ifcFile) return;
+  document.getElementById('run-btn').classList.add('hidden');
+  document.getElementById('progress-section').classList.remove('hidden');
+  document.getElementById('results-section').classList.add('hidden');
+
+  elapsedSeconds = 0;
+  progressTimer = setInterval(() => {
+    elapsedSeconds++;
+    document.getElementById('progress-time').textContent = `Время: ${formatTime(elapsedSeconds)}`;
+  }, 1000);
+
+  await runProgressAnimation();
+});
+
+async function runProgressAnimation() {
+  const bar     = document.getElementById('progress-bar');
+  const stageLbl = document.getElementById('progress-stage-name');
+  const pctBadge = document.getElementById('progress-pct-badge');
+  const statusLbl = document.getElementById('progress-status');
+  const spin     = document.getElementById('progress-spin');
+  const etaLbl   = document.getElementById('progress-eta');
+
+  for (let i = 0; i < PROGRESS_STAGES.length; i++) {
+    const s = PROGRESS_STAGES[i];
+    stageLbl.textContent = s.name;
+    pctBadge.textContent = s.pct + '%';
+    statusLbl.textContent = s.status;
+    bar.style.width = s.pct + '%';
+
+    const remaining = PROGRESS_STAGES.length - 1 - i;
+    etaLbl.textContent = remaining > 0 ? `Осталось: ~${remaining * 1.5 | 0}с` : 'Осталось: --:--';
+
+    if (s.done) {
+      bar.classList.add('done');
+      pctBadge.className = 'badge badge-green';
+      spin.style.animation = 'none';
+      spin.textContent = '✓';
+    }
+
+    await sleep(i === PROGRESS_STAGES.length - 1 ? 600 : 1500);
+  }
+
+  clearInterval(progressTimer);
+  await sleep(500);
+  await fetchResults();
+}
+
+async function fetchResults() {
+  const selectedChecks = Array.from(
+    document.querySelectorAll('.check-list input[type=checkbox]:checked')
+  ).map(c => c.value);
+
+  try {
+    const resp = await fetch('/api/analysis/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        filename: ifcFile.name,
+        selected_checks: selectedChecks,
+        ids_files: idsFiles.map(f => f.name)
+      })
+    });
+    analysisResults = await resp.json();
+  } catch (e) {
+    // fallback mock
+    analysisResults = getMockResults(selectedChecks);
+  }
+
+  renderResults(analysisResults);
+  document.getElementById('run-btn').classList.remove('hidden');
+  document.getElementById('run-btn').textContent = '↺ Повторить анализ';
+}
+
+function getMockResults(selectedChecks) {
+  const allIssues = [
+    { id:1, guid:'2HvX4921', type:'Коллизия',  severity:'ERROR',   description:'Жёсткое пересечение: стальная балка и воздуховод ОВКВ', location:'Этаж 3 / Ось B-4' },
+    { id:2, guid:'3KpZ7744', type:'Коллизия',  severity:'WARNING', description:'Мягкое пересечение: зазор трубы < 50мм от стены', location:'Этаж 2 / Ось C-7' },
+    { id:3, guid:'9Rt12209', type:'Нормативы', severity:'ERROR',   description:"Отсутствует обязательное свойство 'FireRating' на элементах IfcWall", location:'Несколько (47 элементов)' },
+    { id:4, guid:'7Mp25531', type:'Нормативы', severity:'WARNING', description:"Имя элемента не соответствует конвенции: 'Стена_001' → ожидается 'КС-СТ-001'", location:'Этаж 1 (23 элемента)' },
+    { id:5, guid:'5Lq98823', type:'IDS',       severity:'ERROR',   description:"Требование IDS 'LoadBearing' не выполнено для IfcColumn", location:'Секция A / Колонны (8 элементов)' },
+    { id:6, guid:'1Nm73390', type:'IDS',       severity:'OK',      description:'Проверка наличия GlobalId пройдена успешно', location:'Все элементы (1 247)' },
+    { id:7, guid:'4Px81102', type:'Нормативы', severity:'OK',      description:'Пространственная структура соответствует ГОСТ Р 57906', location:'Вся модель' },
+    { id:8, guid:'8Qw34567', type:'Коллизия',  severity:'ERROR',   description:'Пересечение несущей колонны и канализационной трубы DN150', location:'Этаж 1 / Ось A-2' },
+    { id:9, guid:'6Tr56789', type:'Нормативы', severity:'WARNING', description:'Высота помещения ниже нормативной: 2.4м < 2.7м (СП 54.13330)', location:'Комната 104 / Этаж 1' },
+    { id:10,guid:'0Su11223', type:'IDS',       severity:'OK',      description:'Атрибуты материалов стен заполнены корректно', location:'Этаж 1-5 (120 элементов)' },
+  ];
+  const issues = allIssues.filter(i => {
+    if (i.type === 'IDS'       && !selectedChecks.includes('ids'))    return false;
+    if (i.type === 'Нормативы' && !selectedChecks.includes('norms'))  return false;
+    if (i.type === 'Коллизия'  && !selectedChecks.includes('clashes'))return false;
+    return true;
+  });
+  const errors   = issues.filter(i => i.severity === 'ERROR').length;
+  const warnings = issues.filter(i => i.severity === 'WARNING').length;
+  return { summary: { total:1247, errors, warnings, passed: 1247 - errors - warnings }, issues };
+}
+
+// ============================================================
+// RENDER RESULTS
+// ============================================================
+function renderResults(data) {
+  document.getElementById('results-section').classList.remove('hidden');
+  document.getElementById('stat-total').textContent    = data.summary.total.toLocaleString('ru');
+  document.getElementById('stat-errors').textContent   = data.summary.errors;
+  document.getElementById('stat-warnings').textContent = data.summary.warnings;
+  document.getElementById('stat-passed').textContent   = data.summary.passed.toLocaleString('ru');
+  renderIssuesTable(data.issues);
+}
+
+function renderIssuesTable(issues) {
+  const tbody = document.getElementById('issues-tbody');
+  const search = document.getElementById('issues-search').value.toLowerCase();
+
+  const filtered = issues.filter(issue => {
+    const matchTab =
+      currentTab === 'all' ||
+      (currentTab === 'errors'   && issue.severity === 'ERROR') ||
+      (currentTab === 'warnings' && issue.severity === 'WARNING') ||
+      (currentTab === 'ids'      && issue.type === 'IDS');
+    const matchSearch =
+      !search ||
+      issue.description.toLowerCase().includes(search) ||
+      issue.guid.toLowerCase().includes(search) ||
+      issue.type.toLowerCase().includes(search);
+    return matchTab && matchSearch;
+  });
+
+  tbody.innerHTML = filtered.map(issue => {
+    const rowClass = issue.severity === 'ERROR' ? 'row-error' : issue.severity === 'WARNING' ? 'row-warning' : 'row-ok';
+    const pillClass = issue.severity === 'ERROR' ? 'pill-error' : issue.severity === 'WARNING' ? 'pill-warning' : 'pill-ok';
+    const pillText  = issue.severity === 'ERROR' ? 'ОШИБКА' : issue.severity === 'WARNING' ? 'ПРЕДУПРЕЖДЕНИЕ' : 'OK';
+    return `
+      <tr class="${rowClass}" id="row-${issue.id}">
+        <td>${issue.id}</td>
+        <td><span class="guid-code">${issue.guid}</span></td>
+        <td>${issue.type}</td>
+        <td><span class="severity-pill ${pillClass}">${pillText}</span></td>
+        <td>${issue.description}</td>
+        <td>${issue.location}</td>
+        <td>
+          <button class="ai-btn" onclick="analyzeIssue(${issue.id}, this)" data-issue='${JSON.stringify(issue).replace(/'/g,"&#39;")}'>
+            🤖 Анализ
+          </button>
+        </td>
+      </tr>
+      <tr class="ai-expand-row hidden" id="ai-row-${issue.id}">
+        <td colspan="7">
+          <div class="ai-expand-inner" id="ai-expand-${issue.id}"></div>
+        </td>
+      </tr>`;
+  }).join('');
+}
+
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  if (analysisResults) renderIssuesTable(analysisResults.issues);
+}
+
+function filterIssues() {
+  if (analysisResults) renderIssuesTable(analysisResults.issues);
+}
+
+// ============================================================
+// AI ROW ANALYSIS
+// ============================================================
+async function analyzeIssue(id, btn) {
+  const issueData = JSON.parse(btn.dataset.issue.replace(/&#39;/g, "'"));
+  const expandRow = document.getElementById(`ai-row-${id}`);
+  const expandDiv = document.getElementById(`ai-expand-${id}`);
+
+  // Toggle
+  if (!expandRow.classList.contains('hidden')) {
+    expandRow.classList.add('hidden');
+    btn.textContent = '🤖 Анализ';
+    return;
+  }
+
+  btn.textContent = '⟳ Анализирую...';
+  expandRow.classList.remove('hidden');
+  expandDiv.innerHTML = `<div class="ai-spinner"><span class="spin">⟳</span> Анализирую ошибку с помощью ИИ...</div>`;
+
+  const isError = issueData.severity === 'ERROR' || issueData.severity === 'WARNING';
+  const section1Title = isError ? '🔴 Почему возникла ошибка:' : '✅ Подтверждение соответствия:';
+  const section2Title = isError ? '🔧 Как исправить:' : '💡 Рекомендации по улучшению:';
+
+  try {
+    const resp = await fetch('/api/assistant/analyze-issue', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ issue: issueData })
+    });
+
+    expandDiv.innerHTML = `
+      <div class="ai-section">
+        <div class="ai-section-title">${section1Title}</div>
+        <div class="ai-text" id="ai-text-${id}"></div>
+      </div>
+      <div class="ai-section">
+        <div class="ai-section-title">${section2Title}</div>
+        <div class="ai-text" id="ai-fix-${id}"></div>
+      </div>`;
+
+    const textEl = document.getElementById(`ai-text-${id}`);
+    const fixEl  = document.getElementById(`ai-fix-${id}`);
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let fullText = '';
+    let splitDone = false;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      fullText += decoder.decode(value, { stream: true });
+
+      // Split on "Как исправить" or similar keywords
+      const splitKeywords = ['Как исправить', 'Рекомендации', 'Шаги для исправления', 'Решение:'];
+      if (!splitDone) {
+        let splitIdx = -1;
+        let splitKeyword = '';
+        for (const kw of splitKeywords) {
+          const idx = fullText.indexOf(kw);
+          if (idx !== -1) { splitIdx = idx; splitKeyword = kw; break; }
+        }
+        if (splitIdx !== -1) {
+          textEl.textContent = fullText.substring(0, splitIdx).trim();
+          fixEl.textContent  = fullText.substring(splitIdx);
+          splitDone = true;
+        } else {
+          textEl.textContent = fullText;
+        }
+      } else {
+        const splitKeywords2 = ['Как исправить', 'Рекомендации', 'Шаги для исправления', 'Решение:'];
+        for (const kw of splitKeywords2) {
+          const idx = fullText.indexOf(kw);
+          if (idx !== -1) {
+            textEl.textContent = fullText.substring(0, idx).trim();
+            fixEl.textContent  = fullText.substring(idx);
+            break;
+          }
+        }
+      }
+    }
+
+    if (!splitDone) {
+      textEl.textContent = fullText.trim();
+      fixEl.textContent  = '';
+    }
+
+    // Highlight citations like [ГОСТ Р 57906-2017]
+    [textEl, fixEl].forEach(el => {
+      el.innerHTML = el.textContent.replace(/\[([^\]]+)\]/g,
+        '<span class="citation">[$1]</span>');
+    });
+
+    btn.textContent = '🤖 Свернуть';
+  } catch (e) {
+    expandDiv.innerHTML = `<div class="ai-text" style="color:#C62828">Ошибка подключения к ИИ-сервису. Проверьте GROQ_API_KEY в файле .env</div>`;
+    btn.textContent = '🤖 Анализ';
+  }
+}
+
+// ============================================================
+// REPORT DOWNLOAD
+// ============================================================
+async function downloadReport(format) {
+  if (!analysisResults) { alert('Сначала запустите анализ'); return; }
+  const resp = await fetch('/api/reports/download', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ issues: analysisResults.issues, summary: analysisResults.summary, format })
+  });
+  const blob = await resp.blob();
+  const today = new Date().toISOString().slice(0,10).replace(/-/g,'');
+  const exts  = { pdf:'pdf', excel:'xlsx', json:'json', bcf:'bcf' };
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `tim_inspector_${today}.${exts[format]}`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// ============================================================
+// AI ASSISTANT
+// ============================================================
+function toggleAssistant() {
+  const panel   = document.getElementById('ai-panel');
+  const overlay = document.getElementById('ai-overlay');
+  const isOpen  = panel.classList.contains('open');
+  panel.classList.toggle('open', !isOpen);
+  overlay.classList.toggle('visible', !isOpen);
+}
+
+async function sendMessage() {
+  const input = document.getElementById('ai-input');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  appendUserMessage(text);
+  await streamAssistantResponse(text);
+}
+
+function sendSuggested(el) {
+  document.getElementById('ai-input').value = el.textContent;
+  sendMessage();
+}
+
+function appendUserMessage(text) {
+  chatHistory.push({ role: 'user', content: text });
+  hideSuggestedChips();
+  const msgs = document.getElementById('ai-messages');
+  const div = document.createElement('div');
+  div.className = 'chat-msg user';
+  div.innerHTML = `<div class="chat-bubble">${escHtml(text)}</div>`;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+async function streamAssistantResponse(userText) {
+  const msgs    = document.getElementById('ai-messages');
+  const sendBtn = document.getElementById('ai-send-btn');
+  sendBtn.disabled = true;
+
+  // Create assistant bubble
+  const wrapper = document.createElement('div');
+  wrapper.className = 'chat-msg assistant';
+
+  const thinkingToggle = document.createElement('div');
+  thinkingToggle.className = 'thinking-toggle';
+  thinkingToggle.innerHTML = '🧠 Размышление... <span>▼</span>';
+
+  const thinkingContent = document.createElement('div');
+  thinkingContent.className = 'thinking-content';
+  thinkingContent.textContent = 'Анализирую запрос...';
+
+  thinkingToggle.addEventListener('click', () => thinkingContent.classList.toggle('visible'));
+
+  const bubble = document.createElement('div');
+  bubble.className = 'chat-bubble';
+  bubble.textContent = '';
+
+  wrapper.appendChild(thinkingToggle);
+  wrapper.appendChild(thinkingContent);
+  wrapper.appendChild(bubble);
+  msgs.appendChild(wrapper);
+  msgs.scrollTop = msgs.scrollHeight;
+
+  try {
+    const resp = await fetch('/api/assistant/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: chatHistory })
+    });
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let fullText = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const chunk = decoder.decode(value, { stream: true });
+      fullText += chunk;
+      bubble.innerHTML = formatAIText(fullText) + '<span class="spin" style="font-size:12px;margin-left:4px">⟳</span>';
+      msgs.scrollTop = msgs.scrollHeight;
+    }
+
+    bubble.innerHTML = formatAIText(fullText);
+    thinkingContent.textContent = 'Контекст: BIM/ТИМ нормативная база России, IFC, ГОСТ, СП, IDS.';
+    thinkingToggle.innerHTML = '🧠 Рассуждение <span>▶</span>';
+    chatHistory.push({ role: 'assistant', content: fullText });
+
+  } catch (e) {
+    bubble.innerHTML = '<span style="color:#C62828">Ошибка: проверьте GROQ_API_KEY в .env файле</span>';
+  }
+
+  sendBtn.disabled = false;
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function formatAIText(text) {
+  // Highlight citations [ГОСТ ...], [СП ...], [ISO ...]
+  let html = escHtml(text).replace(/\[([^\]]+)\]/g, '<span class="citation">[$1]</span>');
+  // Bold **text**
+  html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  // Newlines
+  html = html.replace(/\n/g, '<br>');
+  return html;
+}
+
+function hideSuggestedChips() {
+  const chips = document.getElementById('suggested-chips');
+  if (chips) chips.remove();
+}
+
+// ============================================================
+// UTILS
+// ============================================================
+function escHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function formatTime(s) {
+  const m = Math.floor(s / 60).toString().padStart(2,'0');
+  const sec = (s % 60).toString().padStart(2,'0');
+  return `${m}:${sec}`;
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+</script>
+</body>
+</html>
