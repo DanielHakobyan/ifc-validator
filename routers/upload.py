@@ -4,7 +4,7 @@ from fastapi import APIRouter, UploadFile, File, HTTPException
 from fastapi.responses import JSONResponse
 
 router = APIRouter()
-UPLOAD_DIR = "uploads"
+UPLOAD_DIR = "/tmp/uploads"
 
 
 @router.post("/ifc")
