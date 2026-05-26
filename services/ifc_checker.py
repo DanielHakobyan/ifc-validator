@@ -155,6 +155,15 @@ def _check_norms(model: "ifcopenshell.file", issues: list, issue_id_counter: lis
 
         for prop, bad_elements in missing_map.items():
             if not bad_elements:
+                issues.append({
+                    "id": issue_id_counter[0],
+                    "guid": "N/A",
+                    "type": "Нормативы",
+                    "severity": "OK",
+                    "description": f"Обязательное свойство '{prop}' присутствует у всех элементов {ifc_type}",
+                    "location": "Вся модель",
+                })
+                issue_id_counter[0] += 1
                 continue
             # Group report: one issue per (type, missing_prop)
             count = len(bad_elements)
@@ -172,7 +181,9 @@ def _check_norms(model: "ifcopenshell.file", issues: list, issue_id_counter: lis
             issue_id_counter[0] += 1
 
     # Room height check — СП 54.13330.2022 п.4.4 (min 2.7 m residential)
-    for space in model.by_type("IfcSpace"):
+    height_issues_found = False
+    spaces = model.by_type("IfcSpace")
+    for space in spaces:
         all_props = _get_all_props(space)
         raw_height = (
             all_props.get("Height")
@@ -190,6 +201,7 @@ def _check_norms(model: "ifcopenshell.file", issues: list, issue_id_counter: lis
         space_name = _name(space)
 
         if height < 2.7:
+            height_issues_found = True
             issues.append({
                 "id": issue_id_counter[0],
                 "guid": _guid(space),
@@ -202,6 +214,17 @@ def _check_norms(model: "ifcopenshell.file", issues: list, issue_id_counter: lis
                 "location": storey,
             })
             issue_id_counter[0] += 1
+
+    if not height_issues_found and spaces:
+        issues.append({
+            "id": issue_id_counter[0],
+            "guid": "N/A",
+            "type": "Нормативы",
+            "severity": "OK",
+            "description": f"Высота всех {len(spaces)} помещений соответствует нормам (≥ 2.7м)",
+            "location": "Вся модель",
+        })
+        issue_id_counter[0] += 1
 
 
 # ---------------------------------------------------------------------------
@@ -242,86 +265,122 @@ def _check_naming(model: "ifcopenshell.file", issues: list, issue_id_counter: li
         })
         issue_id_counter[0] += 1
 
+    if no_name_count == 0 and generic_count == 0:
+        issues.append({
+            "id": issue_id_counter[0],
+            "guid": "N/A",
+            "type": "Именование",
+            "severity": "OK",
+            "description": "Все элементы имеют корректные уникальные имена",
+            "location": "Вся модель",
+        })
+        issue_id_counter[0] += 1
+
 
 # ---------------------------------------------------------------------------
 # Check 4 — Clash Detection (Bounding Box)
 # ---------------------------------------------------------------------------
 
-def _check_clashes(model: "ifcopenshell.file", issues: list, issue_id_counter: list):
-    settings = ifcopenshell.geom.settings()
-    elements_with_bbox = []
-
-    # Use the iterator — processes geometry in batches, far faster than create_shape per element
+def _load_geometry(model, settings, result_list, max_elements=400):
+    """Load bounding boxes in a background thread (single-threaded, no multiprocessing)."""
     try:
-        iterator = ifcopenshell.geom.iterator(
-            settings, model, multiprocessing.cpu_count()
-        )
-        has_item = iterator.initialize()
-    except Exception:
-        has_item = False
-
-    if has_item:
+        # num_threads=1 avoids the Windows multiprocessing deadlock
+        iterator = ifcopenshell.geom.iterator(settings, model, 1)
+        if not iterator.initialize():
+            return
         while True:
             try:
                 shape = iterator.get()
                 element = model.by_id(shape.id)
-                if element is None:
-                    continue
-                verts = shape.geometry.verts
-                if not verts:
-                    continue
-                xs = verts[0::3]
-                ys = verts[1::3]
-                zs = verts[2::3]
-                elements_with_bbox.append({
-                    "element": element,
-                    "min": (min(xs), min(ys), min(zs)),
-                    "max": (max(xs), max(ys), max(zs)),
-                })
-                # Cap geometry loading at 500 elements to stay fast
-                if len(elements_with_bbox) >= 500:
-                    break
+                if element is not None:
+                    verts = shape.geometry.verts
+                    if verts:
+                        xs = verts[0::3]
+                        ys = verts[1::3]
+                        zs = verts[2::3]
+                        result_list.append({
+                            "element": element,
+                            "is_a": element.is_a(),
+                            "name": _name(element),
+                            "storey": _get_storey(element),
+                            "min": (min(xs), min(ys), min(zs)),
+                            "max": (max(xs), max(ys), max(zs)),
+                        })
+                        if len(result_list) >= max_elements:
+                            break
             except Exception:
                 pass
             if not iterator.next():
                 break
+    except Exception:
+        pass
 
-    def bbox_intersects(a, b) -> bool:
-        return (
-            a["min"][0] < b["max"][0] and a["max"][0] > b["min"][0]
-            and a["min"][1] < b["max"][1] and a["max"][1] > b["min"][1]
-            and a["min"][2] < b["max"][2] and a["max"][2] > b["min"][2]
-        )
+
+def _check_clashes(model: "ifcopenshell.file", issues: list, issue_id_counter: list):
+    import threading
+    settings = ifcopenshell.geom.settings()
+    elements_with_bbox = []
+
+    # Run geometry loading in a daemon thread with a hard 30-second timeout.
+    # This prevents the Windows multiprocessing deadlock from hanging the server.
+    loader = threading.Thread(
+        target=_load_geometry,
+        args=(model, settings, elements_with_bbox),
+        daemon=True,
+    )
+    loader.start()
+    loader.join(timeout=30)  # give geometry loading at most 30 seconds
+
+    if loader.is_alive():
+        # Geometry loading timed out — report a warning and skip clash math
+        issues.append({
+            "id": issue_id_counter[0],
+            "guid": "N/A",
+            "type": "Коллизия",
+            "severity": "WARNING",
+            "description": "Проверка коллизий пропущена: загрузка геометрии заняла более 30 сек.",
+            "location": "Вся модель",
+        })
+        issue_id_counter[0] += 1
+        return
 
     clash_count = 0
-    CAP = 20
+    REPORT_CAP = 50  # show at most 50 clash rows; bbox clashes produce many false positives
+
+    # O(N log N) Sweep and Prune algorithm for ultra-fast collision checking
+    elements_with_bbox.sort(key=lambda x: x["min"][0])
 
     for i in range(len(elements_with_bbox)):
-        if clash_count >= CAP:
-            break
+        a = elements_with_bbox[i]
         for j in range(i + 1, len(elements_with_bbox)):
-            if clash_count >= CAP:
-                break
-            a = elements_with_bbox[i]
             b = elements_with_bbox[j]
-            if a["element"].is_a() == b["element"].is_a():
+
+            # Since array is sorted by min X, if b's min X > a's max X no further j can match
+            if b["min"][0] > a["max"][0]:
+                break
+
+            if a["is_a"] == b["is_a"]:
                 continue
-            if bbox_intersects(a, b):
-                el_a = a["element"]
-                el_b = b["element"]
-                issues.append({
-                    "id": issue_id_counter[0],
-                    "guid": _guid(el_a),
-                    "type": "Коллизия",
-                    "severity": "ERROR",
-                    "description": (
-                        f"Пересечение: {el_a.is_a()} '{_name(el_a)}' "
-                        f"и {el_b.is_a()} '{_name(el_b)}'"
-                    ),
-                    "location": _get_storey(el_a),
-                })
-                issue_id_counter[0] += 1
+
+            # Check Y and Z axis intersections
+            if (a["min"][1] < b["max"][1] and a["max"][1] > b["min"][1] and
+                    a["min"][2] < b["max"][2] and a["max"][2] > b["min"][2]):
+
                 clash_count += 1
+                if clash_count <= REPORT_CAP:
+                    el_a = a["element"]
+                    issues.append({
+                        "id": issue_id_counter[0],
+                        "guid": _guid(el_a),
+                        "type": "Коллизия",
+                        "severity": "ERROR",
+                        "description": (
+                            f"Пересечение: {a['is_a']} '{a['name']}' "
+                            f"и {b['is_a']} '{b['name']}'"
+                        ),
+                        "location": a["storey"],
+                    })
+                    issue_id_counter[0] += 1
 
     if clash_count == 0:
         issues.append({
@@ -330,6 +389,20 @@ def _check_clashes(model: "ifcopenshell.file", issues: list, issue_id_counter: l
             "type": "Коллизия",
             "severity": "OK",
             "description": "Коллизии не обнаружены (проверка ограничивающих объёмов)",
+            "location": "Вся модель",
+        })
+        issue_id_counter[0] += 1
+    elif clash_count > REPORT_CAP:
+        issues.append({
+            "id": issue_id_counter[0],
+            "guid": "N/A",
+            "type": "Коллизия",
+            "severity": "WARNING",
+            "description": (
+                f"Всего обнаружено {clash_count} пересечений ограничивающих объёмов. "
+                f"Показаны первые {REPORT_CAP}. Часть может быть ложными срабатываниями — "
+                f"рекомендуется детальная проверка в Revit/Navisworks."
+            ),
             "location": "Вся модель",
         })
         issue_id_counter[0] += 1
