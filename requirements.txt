@@ -7,3 +7,4 @@ groq
 reportlab
 openpyxl
 aiofiles
+ifcopenshell

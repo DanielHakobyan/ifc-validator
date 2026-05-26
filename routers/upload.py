@@ -21,6 +21,7 @@ async def upload_ifc(file: UploadFile = File(...)):
     return JSONResponse({
         "success": True,
         "filename": file.filename,
+        "saved_filename": file.filename,
         "size_mb": round(size_mb, 2),
         "size_bytes": len(content),
         "ifc_schema": "IFC4",
