@@ -11,9 +11,11 @@ from reportlab.pdfbase.ttfonts import TTFont
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+FONT_DIR = os.path.join(BASE_DIR, '..', 'fonts')
 
-pdfmetrics.registerFont(TTFont('DejaVu', r'C:\Windows\Fonts\arial.ttf'))
-pdfmetrics.registerFont(TTFont('DejaVu-Bold', r'C:\Windows\Fonts\arialbd.ttf'))
+pdfmetrics.registerFont(TTFont('DejaVu', os.path.join(FONT_DIR, 'DejaVuSans.ttf')))
+pdfmetrics.registerFont(TTFont('DejaVu-Bold', os.path.join(FONT_DIR, 'DejaVuSans.ttf')))
 
 def generate_pdf(summary: dict, issues: list) -> bytes:
     buffer = io.BytesIO()
