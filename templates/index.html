@@ -8,9 +8,8 @@
   <meta name="description"
     content="Платформа для интеллектуальной проверки BIM/ТИМ моделей на соответствие нормативной документации ГОСТ, СП, IFC, IDS" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link
-    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
-    rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
   <link rel="stylesheet" href="/static/style.css?v=2.0.0" />
 </head>
 
@@ -18,7 +17,7 @@
 
   <!-- ===== HEADER ===== -->
   <header class="app-header">
-    <div class="logo">🏢 ТИМ Инспектор</div>
+    <div class="logo"><i class="ph-fill ph-buildings" style="margin-right:8px;"></i> ТИМ Инспектор</div>
     <div class="tagline">Интеллектуальная проверка BIM-моделей</div>
   </header>
 
@@ -27,14 +26,14 @@
 
     <!-- SECTION 1: Загрузка IFC -->
     <div class="card" id="section-upload">
-      <div class="card-header">📂 Загрузка модели</div>
+      <div class="card-header"><i class="ph-fill ph-folder-open" style="margin-right:6px;"></i> Загрузка модели</div>
       <div class="card-body">
         <span class="label">IFC файл:</span>
 
         <!-- Drop zone -->
         <div class="drop-zone" id="ifc-dropzone">
-          <span class="dz-icon">📁</span>
-          <span class="dz-title">Перетащите IFC файл сюда</span>
+          <span class="dz-icon"><i class="ph-fill ph-upload-simple"></i></span>
+          <span class="dz-title">Загрузите IFC файл</span>
           <span class="dz-sub">или нажмите для выбора</span>
           <input type="file" id="ifc-file-input" accept=".ifc,.ifczip" />
         </div>
@@ -42,7 +41,7 @@
         <!-- File chip (hidden until file selected) -->
         <div id="ifc-file-info" class="hidden mt-12">
           <div class="file-chip">
-            <span>✓</span>
+            <span><i class="ph-bold ph-check"></i></span>
             <span class="chip-name" id="ifc-chip-name"></span>
             <button class="chip-remove" id="ifc-clear-btn" title="Удалить файл">×</button>
           </div>
@@ -53,7 +52,7 @@
 
     <!-- SECTION 2: Тип проверки -->
     <div class="card">
-      <div class="card-header">☑ Тип проверки</div>
+      <div class="card-header"><i class="ph-fill ph-check-square" style="margin-right:6px;"></i> Тип проверки</div>
       <div class="card-body">
         <div class="check-list">
           <label class="check-item">
@@ -74,10 +73,10 @@
 
     <!-- SECTION 2b: Загрузка IDS (скрыт по умолчанию) -->
     <div class="card hidden" id="ids-upload-section">
-      <div class="card-header">📋 Загрузка IDS файлов</div>
+      <div class="card-header"><i class="ph-fill ph-clipboard-text" style="margin-right:6px;"></i> Загрузка IDS файлов</div>
       <div class="card-body">
         <div class="drop-zone drop-zone-sm" id="ids-dropzone">
-          <span class="dz-icon" style="font-size:32px">📋</span>
+          <span class="dz-icon" style="font-size:32px"><i class="ph-fill ph-files"></i></span>
           <span class="dz-title">Перетащите IDS файлы сюда</span>
           <span class="dz-sub">или нажмите для выбора</span>
           <input type="file" id="ids-file-input" accept=".ids,.xml" multiple />
@@ -97,16 +96,16 @@
 
     <!-- BUTTON: Запуск анализа -->
     <button class="btn-run" id="run-btn" disabled>
-      ▶ Запуск анализа
+      <i class="ph-fill ph-play-circle"></i> Запуск анализа
     </button>
 
     <!-- SECTION 3: Прогресс (скрыт по умолчанию) -->
     <div class="card hidden" id="progress-section">
-      <div class="card-header">⚡ Запуск анализа</div>
+      <div class="card-header"><i class="ph-fill ph-lightning" style="margin-right:6px;"></i> Запуск анализа</div>
       <div class="card-body">
         <div class="progress-stage">
           <div class="stage-left">
-            <span class="spin" id="progress-spin">⟳</span>
+            <span class="spin" id="progress-spin"><i class="ph-bold ph-spinner-gap"></i></span>
             <span id="progress-stage-name">Загрузка IFC</span>
           </div>
           <span class="badge badge-blue" id="progress-pct-badge">5%</span>
@@ -133,21 +132,21 @@
         </div>
         <div class="stat-card stat-error">
           <div class="stat-value" id="stat-errors">0</div>
-          <div class="stat-label">Ошибок 🔴</div>
+          <div class="stat-label">Ошибок <i class="ph-fill ph-warning-circle" style="color:#F43F5E"></i></div>
         </div>
         <div class="stat-card stat-warn">
           <div class="stat-value" id="stat-warnings">0</div>
-          <div class="stat-label">Предупреждений 🟡</div>
+          <div class="stat-label">Предупреждений <i class="ph-fill ph-warning" style="color:#F59E0B"></i></div>
         </div>
         <div class="stat-card stat-pass">
           <div class="stat-value" id="stat-passed">0</div>
-          <div class="stat-label">Прошло 🟢</div>
+          <div class="stat-label">Прошло <i class="ph-fill ph-check-circle" style="color:#10B981"></i></div>
         </div>
       </div>
 
       <!-- 4b: Issues table card -->
       <div class="card">
-        <div class="card-header">📋 Результаты проверки</div>
+        <div class="card-header"><i class="ph-fill ph-list-checks" style="margin-right:6px;"></i> Результаты проверки</div>
         <div class="card-body">
 
           <!-- Tab bar -->
@@ -160,7 +159,7 @@
 
           <!-- Search -->
           <div class="search-box">
-            <span>🔍</span>
+            <span><i class="ph-bold ph-magnifying-glass"></i></span>
             <input type="text" id="issues-search" placeholder="Поиск по описанию или GUID..."
               oninput="filterIssues()" />
           </div>
@@ -186,27 +185,32 @@
 
         <!-- Download bar -->
         <div class="download-bar">
-          <button class="btn btn-outline" onclick="downloadReport('pdf')">⬇ PDF</button>
-          <button class="btn btn-outline" onclick="downloadReport('excel')">⬇ Excel</button>
-          <button class="btn btn-outline" onclick="downloadReport('json')">⬇ JSON</button>
-          <button class="btn btn-outline" onclick="downloadReport('bcf')">⬇ BCF</button>
+          <button class="btn btn-outline" onclick="downloadReport('pdf')"><i class="ph-fill ph-file-pdf"></i> PDF</button>
+          <button class="btn btn-outline" onclick="downloadReport('excel')"><i class="ph-fill ph-file-xls"></i> Excel</button>
+          <button class="btn btn-outline" onclick="downloadReport('json')"><i class="ph-fill ph-file-code"></i> JSON</button>
+          <button class="btn btn-outline" onclick="downloadReport('bcf')"><i class="ph-fill ph-file-zip"></i> BCF</button>
         </div>
       </div>
     </div>
 
   </main>
 
+  <!-- ===== FOOTER ===== -->
+  <footer class="app-footer">
+    <p>by Алина <i class="ph-fill ph-sparkle"></i></p>
+  </footer>
+
   <!-- ===== AI OVERLAY ===== -->
   <div class="overlay" id="ai-overlay" onclick="toggleAssistant()"></div>
 
   <!-- ===== AI FAB ===== -->
-  <button class="fab" id="fab-btn" onclick="toggleAssistant()" title="ИИ-Ассистент">💬</button>
+  <button class="fab" id="fab-btn" onclick="toggleAssistant()" title="ИИ-Ассистент"><i class="ph-fill ph-sparkle"></i></button>
 
   <!-- ===== AI PANEL ===== -->
   <aside class="ai-panel" id="ai-panel">
     <div class="ai-panel-header">
       <div class="header-info">
-        <h3>🤖 ИИ-Ассистент</h3>
+        <h3><i class="ph-fill ph-sparkle"></i> ИИ-Ассистент</h3>
         <p>Задайте вопрос по нормативной документации</p>
       </div>
       <button class="ai-close" onclick="toggleAssistant()">×</button>
@@ -228,7 +232,7 @@
     <div class="ai-input-area">
       <input type="text" id="ai-input" placeholder="Введите вопрос..."
         onkeydown="if(event.key==='Enter') sendMessage()" />
-      <button class="ai-send-btn" id="ai-send-btn" onclick="sendMessage()">Отправить →</button>
+      <button class="ai-send-btn" id="ai-send-btn" onclick="sendMessage()">Отправить <i class="ph-bold ph-paper-plane-right"></i></button>
     </div>
   </aside>
 
@@ -332,7 +336,7 @@
       count.textContent = `Выбрано: ${idsFiles.length} файл(ов)`;
       list.innerHTML = idsFiles.map((f, i) => `
     <div class="ids-file-row">
-      <span class="file-name">📄 ${f.name}</span>
+      <span class="file-name"><i class=\'ph-fill ph-file-text\'></i> ${f.name}</span>
       <button class="remove-btn" onclick="removeIdsFile(${i})">×</button>
     </div>`).join('');
     }
@@ -418,7 +422,7 @@
       pctBadge.className = 'badge badge-green';
       pctBadge.textContent = '100%';
       spin.style.animation = 'none';
-      spin.textContent = '✓';
+      spin.innerHTML = '<i class="ph-bold ph-check"></i>';
       etaLbl.textContent = 'Осталось: --:--';
 
       clearInterval(progressTimer);
@@ -429,7 +433,7 @@
       }
 
       document.getElementById('run-btn').classList.remove('hidden');
-      document.getElementById('run-btn').textContent = '↺ Повторить анализ';
+      document.getElementById('run-btn').innerHTML = '<i class=\'ph-bold ph-arrow-counter-clockwise\'></i> Повторить анализ';
     }
 
     // Returns the results object on success, or null on error
@@ -580,7 +584,7 @@
         <td>${issue.location}</td>
         <td>
           <button class="ai-btn" onclick="analyzeIssue(${issue.id}, this)" data-issue='${JSON.stringify(issue).replace(/'/g, "&#39;")}'>
-            🤖 Анализ
+            <i class="ph-fill ph-sparkle"></i> Анализ
           </button>
         </td>
       </tr>
@@ -613,17 +617,17 @@
       // Toggle
       if (!expandRow.classList.contains('hidden')) {
         expandRow.classList.add('hidden');
-        btn.textContent = '🤖 Анализ';
+        btn.innerHTML = '<i class="ph-fill ph-sparkle"></i> Анализ';
         return;
       }
 
-      btn.textContent = '⟳ Анализирую...';
+      btn.innerHTML = '<i class=\'ph-bold ph-spinner-gap spin\'></i> Анализирую...';
       expandRow.classList.remove('hidden');
       expandDiv.innerHTML = `<div class="ai-spinner"><span class="spin">⟳</span> Анализирую ошибку с помощью ИИ...</div>`;
 
       const isError = issueData.severity === 'ERROR' || issueData.severity === 'WARNING';
-      const section1Title = isError ? '🔴 Почему возникла ошибка:' : '✅ Подтверждение соответствия:';
-      const section2Title = isError ? '🔧 Как исправить:' : '💡 Рекомендации по улучшению:';
+      const section1Title = isError ? '<i class=\'ph-fill ph-warning-circle\' style=\'color:#F43F5E\'></i> Почему возникла ошибка:' : '<i class=\'ph-fill ph-check-circle\' style=\'color:#10B981\'></i> Подтверждение соответствия:';
+      const section2Title = isError ? '<i class=\'ph-fill ph-wrench\' style=\'color:#3B82F6\'></i> Как исправить:' : '<i class=\'ph-fill ph-lightbulb\' style=\'color:#F59E0B\'></i> Рекомендации по улучшению:';
 
       try {
         const resp = await fetch('/api/assistant/analyze-issue', {
@@ -695,10 +699,10 @@
             '<span class="citation">[$1]</span>');
         });
 
-        btn.textContent = '🤖 Свернуть';
+        btn.innerHTML = '<i class=\'ph-fill ph-caret-up\'></i> Свернуть';
       } catch (e) {
         expandDiv.innerHTML = `<div class="ai-text" style="color:#C62828">Ошибка подключения к ИИ-сервису. Проверьте GROQ_API_KEY в файле .env</div>`;
-        btn.textContent = '🤖 Анализ';
+        btn.innerHTML = '<i class="ph-fill ph-sparkle"></i> Анализ';
       }
     }
 
@@ -769,7 +773,7 @@
 
       const thinkingToggle = document.createElement('div');
       thinkingToggle.className = 'thinking-toggle';
-      thinkingToggle.innerHTML = '🧠 Размышление... <span>▼</span>';
+      thinkingToggle.innerHTML = '<i class=\'ph-fill ph-brain\'></i> Размышление... <span><i class=\'ph-bold ph-caret-down\'></i></span>';
 
       const thinkingContent = document.createElement('div');
       thinkingContent.className = 'thinking-content';
@@ -803,13 +807,13 @@
           if (done) break;
           const chunk = decoder.decode(value, { stream: true });
           fullText += chunk;
-          bubble.innerHTML = formatAIText(fullText) + '<span class="spin" style="font-size:12px;margin-left:4px">⟳</span>';
+          bubble.innerHTML = formatAIText(fullText) + '<span class="spin" style="font-size:12px;margin-left:4px"><i class="ph-bold ph-spinner-gap"></i></span>';
           msgs.scrollTop = msgs.scrollHeight;
         }
 
         bubble.innerHTML = formatAIText(fullText);
         thinkingContent.textContent = 'Контекст: BIM/ТИМ нормативная база России, IFC, ГОСТ, СП, IDS.';
-        thinkingToggle.innerHTML = '🧠 Рассуждение <span>▶</span>';
+        thinkingToggle.innerHTML = '<i class=\'ph-fill ph-brain\'></i> Рассуждение <span><i class=\'ph-bold ph-caret-right\'></i></span>';
         chatHistory.push({ role: 'assistant', content: fullText });
 
       } catch (e) {
